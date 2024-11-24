@@ -92,15 +92,98 @@ class Segment {
     return new Coordinates(a, b);
   }
 }
+class Game {
+  buyTower() {
+    if (this.drachmas < 10) {
+      return;
+    }
 
+    this.drachmas = -10 + this.drachmas;
+    this.towerToBePlaced = new ZeusTower();
+  }
+
+  mouseDown(/** @type{MouseEvent} */ ev) {
+    this.mouseMove(ev);
+    if (this.towerToBePlaced !== null) {
+      this.allTowers.push(this.towerToBePlaced);
+      this.towerToBePlaced = null;
+    }
+  }
+
+  mouseMove(/** @type{MouseEvent} */ ev) {
+    console.log("mouse move", ev);
+    this.lastX = ev.clientX - this.canvasInPageX;
+    this.lastY = ev.clientY - this.canvasInPageY;
+    if (this.towerToBePlaced !== null) {
+      this.towerToBePlaced.x = this.lastX - 20;
+      this.towerToBePlaced.y = this.lastY - 20;
+    }
+  }
+
+  constructor() {
+    this.buyTowerButton = document.getElementById("buyTower");
+    this.buyTowerButton.addEventListener("click", () => {
+      this.buyTower();
+    });
+    /** @type{ZeusTower|null} */
+    this.towerToBePlaced = null;
+    this.statusElement = document.getElementById("status");
+    this.drachmas = 101;
+    canvasBase.addEventListener("mousemove", (ev) => {
+      this.mouseMove(ev);
+    });
+    canvasBase.addEventListener("mousedown", (ev) => {
+      this.mouseDown(ev);
+    });
+    this.lastX = 0;
+    this.lastY = 0;
+    let canvasBoundingRectangle = canvasBase.getBoundingClientRect();
+    this.canvasInPageX = canvasBoundingRectangle.x;
+    this.canvasInPageY = canvasBoundingRectangle.y;
+    /** @type{ZeusTower[]} */
+    this.allTowers = [];
+  }
+  draw() {
+    for (let i = 0; i < this.allTowers.length; i++) {
+      let tower = this.allTowers[i];
+      tower.draw();
+    }
+    if (this.towerToBePlaced !== null) {
+      this.towerToBePlaced.draw();
+    }
+  }
+  displayStatus() {
+    this.statusElement.textContent = `Drachmas ${this.drachmas}`;
+
+  }
+}
+class ZeusTower {
+  constructor() {
+    this.x = 0;
+    this.y = 0;
+
+  }
+  draw() {
+    canvas.fillRect(this.x, this.y, 40, 40);
+
+  }
+}
 class Path {
   constructor() {
     this.wayPoints = [
-      [0, 0],
-      [100, 100],
-      [100, 150],
-      [200, 300],
-      [200, 350]
+      [-10, 50],
+      [525, 50],
+      [525, 150],
+      [350, 150],
+      [350, 250],
+      [525, 250],
+      [525, 350],
+      [325, 350],
+      [325, 450],
+      [50, 450],
+      [50, 550],
+      [525, 550],
+      [525, 670]
     ];
     /** @type {Segment[]} */
     this.segments = [];
@@ -150,10 +233,13 @@ class Road {
 let mainPath = new Path();
 let cyclops1 = new Cyclops();
 let road = new Road();
+let game = new Game();
 function mainLoop() {
   frameCount++;
   clearCanvas();
   road.draw();
   cyclops1.draw();
   //  cyclops2.draw();
+  game.displayStatus();
+  game.draw();
 }
