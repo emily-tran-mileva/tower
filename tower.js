@@ -1,7 +1,7 @@
 "use strict";
 console.log("hello world");
 let image = new Image(); // Create new img element
-image.src = "cyclops.png";
+image.src = "art.png";
 console.log(image);
 /** @type {HTMLCanvasElement} */
 let canvasBase = document.getElementById("canvas");
@@ -9,28 +9,12 @@ let canvas = canvasBase.getContext("2d");
 /** @type {HTMLCanvasElement} */
 let assetCanvasBase = document.getElementById("assetCanvas");
 let assetCanvas = assetCanvasBase.getContext("2d");
-image.addEventListener("load", () => {
-  assetCanvas.drawImage(image, 0, 0);
-  for (let i = 1; i < 4; i++) {
-    assetCanvas.beginPath();
-    assetCanvas.moveTo(i * 41, 0);
-    assetCanvas.lineTo(i * 41, 40);
-    assetCanvas.strokeStyle = "white";
-    assetCanvas.lineWidth = 3;
-    assetCanvas.stroke();
-  }
-  run();
 
-});
 
 function clearCanvas() {
   canvas.clearRect(0, 0, canvasBase.width, canvasBase.height);
 }
 
-function run() {
-  setInterval(mainLoop, 100);
-
-}
 let frameCount = 0;
 
 class Cyclops {
@@ -49,7 +33,7 @@ class Cyclops {
     this.x = -20 + updatedCoordinates.x + Math.random() * 5;
     this.y = -20 + updatedCoordinates.y + Math.random() * 5;
     this.distanceTraveled = this.distanceTraveled + 10;
-    canvas.drawImage(image, 41 * this.pose, 0, 40, 40, this.x, this.y, 40, 40);
+    canvas.drawImage(image, 41 * this.pose + 2, 0, 38, 40, this.x, this.y, 40, 40);
     canvas.beginPath();
     canvas.roundRect(this.x, this.y - 8, 40, 4, 2);
     canvas.fillStyle = "red";
@@ -92,13 +76,15 @@ class Segment {
     return new Coordinates(a, b);
   }
 }
+
+
 class Game {
   buyTower() {
-    if (this.drachmas < 10) {
+    if (this.drachmas < 100) {
       return;
     }
 
-    this.drachmas = -10 + this.drachmas;
+    this.drachmas = -100 + this.drachmas;
     this.towerToBePlaced = new ZeusTower();
   }
 
@@ -106,12 +92,12 @@ class Game {
     this.mouseMove(ev);
     if (this.towerToBePlaced !== null) {
       this.allTowers.push(this.towerToBePlaced);
+      this.towerToBePlaced.placed = true;
       this.towerToBePlaced = null;
     }
   }
 
   mouseMove(/** @type{MouseEvent} */ ev) {
-    console.log("mouse move", ev);
     this.lastX = ev.clientX - this.canvasInPageX;
     this.lastY = ev.clientY - this.canvasInPageY;
     if (this.towerToBePlaced !== null) {
@@ -142,32 +128,187 @@ class Game {
     this.canvasInPageY = canvasBoundingRectangle.y;
     /** @type{ZeusTower[]} */
     this.allTowers = [];
+    /** @type{Cyclops} */
+    this.allMonsters = [];
+    /** @type{MonsterSpawnEvent[]} */
+    this.wave = waveData1;
+    this.waveStartFrame = 0;
   }
+
+  spawnMonsters() {
+    for (let e of this.wave) {
+      this.processOneSpawnEvent(e);
+    }
+  }
+
+  processOneSpawnEvent(/**  @type{MonsterSpawnEvent} */e) {
+    let waveFrame = frameCount - this.waveStartFrame;
+    if (e.startFrame > waveFrame) {
+      return;
+    }
+    let framesSinceEventStart = waveFrame - e.startFrame;
+    let progressTowardsNewSpawn = framesSinceEventStart / e.frequency;
+    if (!this.isInteger(progressTowardsNewSpawn)) {
+      // We are not on an exact spawning frame
+      return;
+    }
+    if (progressTowardsNewSpawn >= e.amount) {
+      // We've spawned all monsters in the event.
+      return;
+    }
+    // We are on the exact frame for spawning a monster.
+    // TODO: We need to take care of non-cyclops monsters,
+    // i.e., we need to take care of e.monster != "cyclops"
+    let monster = new Cyclops();
+    this.allMonsters.push(monster);
+  }
+
+  isInteger(a) {
+    return a === Math.floor(a);
+  }
+
+  fireAtMonsters() {
+    for (let tower of this.allTowers) {
+      tower.fireAtMonsters(this.allMonsters);
+    }
+  }
+
+  prepareNextFrame() {
+    this.spawnMonsters();
+    this.fireAtMonsters();
+    this.displayStatus();
+  }
+
   draw() {
-    for (let i = 0; i < this.allTowers.length; i++) {
-      let tower = this.allTowers[i];
+    for (let tower of this.allTowers) {
       tower.draw();
+    }
+    for (let monster of this.allMonsters) {
+      monster.draw();
     }
     if (this.towerToBePlaced !== null) {
       this.towerToBePlaced.draw();
     }
   }
+
   displayStatus() {
     this.statusElement.textContent = `Drachmas ${this.drachmas}`;
 
   }
 }
+
+
 class ZeusTower {
   constructor() {
     this.x = 0;
     this.y = 0;
-
+    this.reloadTime = 5;
+    this.reloadProgress = 8;
+    this.placed = false;
+    this.range = 150;
+    this.damage = 25;
+    this.lastTargetX = 0;
+    this.lastTargetY = 0;
+    this.attackProgress = 0;
   }
-  draw() {
-    canvas.fillRect(this.x, this.y, 40, 40);
 
+  draw() {
+    this.reloadProgress++;
+    if (this.reloadProgress > this.reloadTime) {
+      this.reloadProgress = this.reloadTime;
+    }
+    if (!this.placed) {
+      canvas.lineWidth = 1;
+      canvas.fillStyle = "rgba(10,25,100,0.5)";
+      canvas.beginPath();
+      canvas.ellipse(this.x + 20, this.y + 20, this.range, this.range, 0, 0, 360);
+      canvas.fill();
+    }
+    canvas.fillStyle = "rgb(255,255,255)";
+    canvas.fillRect(this.x, this.y, 40, 40);
+    canvas.drawImage(image, 2, 42, 38, 40, this.x, this.y, 40, 40);
+    if (this.attackProgress > 0) {
+      // lightning on the monster
+      canvas.beginPath();
+      canvas.lineWidth = 1;
+      canvas.strokeStyle = "rgba(0,0,255,0.5)";
+      canvas.moveTo(this.lastTargetX + 20, this.lastTargetY - 30);
+      canvas.lineTo(this.lastTargetX + 20, this.lastTargetY + 5);
+      canvas.stroke();
+      // lightning coming off from zeus
+      canvas.beginPath();
+      canvas.lineWidth = 1;
+      canvas.strokeStyle = "rgba(0,0,255,0.5)";
+      canvas.moveTo(this.x + 20, this.y - 30);
+      canvas.lineTo(this.x + 20, this.y + 5);
+      canvas.stroke();
+      this.attackProgress--;
+    }
+  }
+
+  fireAtMonsters(/** @type{Cyclops[]} */ allMonsters) {
+    if (this.reloadProgress < this.reloadTime) {
+      // not reloaded yet.
+      return;
+    }
+    /** @type{Cyclops|null} */
+    let candidateTarget = null;
+    let candidateIndex = -1;
+    for (
+      let i = 0;
+      i < allMonsters.length;
+      i++
+    ) {
+      let currentMonster = allMonsters[i];
+      if (!this.isInRange(currentMonster)) {
+        // Skip the rest of the commands in the for loop.
+        continue;
+      }
+      // The candidate target must be in range.
+      if (candidateTarget === null) {
+        // This is the first monster that is in range!
+        candidateTarget = currentMonster;
+        candidateIndex = i;
+      }
+      if (candidateTarget.distanceTraveled < currentMonster.distanceTraveled) {
+        // The current monster is farther along the path than the best candidate so far.
+        candidateTarget = currentMonster;
+        candidateIndex = i;
+      }
+    }
+    if (candidateTarget === null) {
+      return;
+    }
+    // Fire away, need to reload.
+    this.reloadProgress = 0;
+    this.attackProgress = 4;
+    this.hasLastTarget = true;
+    this.lastTargetX = candidateTarget.x;
+    this.lastTargetY = candidateTarget.y;
+    // The -= stuff is equivalent to: 
+    // candidateTarget.health = candidateTarget.health - this.damage;
+    candidateTarget.health -= this.damage;
+    if (candidateTarget.health <= 0) {
+      // The candidateTarget is dead.
+      let lastMonsterIndex = allMonsters.length - 1;
+      let lastMonster = allMonsters[lastMonsterIndex];
+      // Overwrite the candidate monster with the last monster 
+      // (last in the sense of last in the list of monsters, not in the 
+      // sense of most distance traveled).
+      allMonsters[candidateIndex] = lastMonster;
+      // Remove the last Element.
+      allMonsters.pop();
+    }
+  }
+
+  isInRange(/** @type {Cyclops} */candidateMonster) {
+    let distanceX = this.x - candidateMonster.x;
+    let distanceY = this.y - candidateMonster.y;
+    let distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
+    return distance <= this.range;
   }
 }
+
 class Path {
   constructor() {
     this.wayPoints = [
@@ -230,16 +371,56 @@ class Road {
   }
 }
 
+
+/** 
+ * @typedef {{
+ *  startFrame: number,
+ *  monster: string,
+ *  amount: number, 
+ *  frequency: number,
+ * }} MonsterSpawnEvent
+ */
+
+/** @type {MonsterSpawnEvent[]} */
+let waveData1 = [
+  {
+    startFrame: 0,
+    monster: "cyclops",
+    amount: 5,
+    frequency: 10
+  },
+  {
+    startFrame: 70,
+    monster: "cyclops",
+    amount: 5,
+    frequency: 10
+  },
+];
+
+// Game objects
 let mainPath = new Path();
-let cyclops1 = new Cyclops();
 let road = new Road();
 let game = new Game();
+
+// Main loop of the game.
 function mainLoop() {
-  frameCount++;
   clearCanvas();
   road.draw();
-  cyclops1.draw();
-  //  cyclops2.draw();
-  game.displayStatus();
+  game.prepareNextFrame();
   game.draw();
+  frameCount++;
 }
+
+// Load all images and, when loaded, start the mainLoop();
+image.addEventListener("load", () => {
+  assetCanvas.drawImage(image, 0, 0);
+  for (let i = 1; i < 4; i++) {
+    assetCanvas.beginPath();
+    assetCanvas.moveTo(i * 41, 0);
+    assetCanvas.lineTo(i * 41, 40);
+    assetCanvas.strokeStyle = "white";
+    assetCanvas.lineWidth = 3;
+    assetCanvas.stroke();
+  }
+  setInterval(mainLoop, 100);
+});
