@@ -56,6 +56,21 @@ class Coordinates {
   }
 }
 
+/** 
+ * The distance between two points.
+ */
+function vectorLength(/** @type{number[]} */ vector) {
+  return Math.sqrt(dotProduct(vector, vector));
+}
+
+function vectorTimesScalar(/** @type{number[]} */vector, /** @type{number} */scalar) {
+  return [vector[0] * scalar, vector[0] * scalar];
+}
+
+function dotProduct(/** @type{number[]} */ firstPoint, /** @type{number[]} */ secondPoint) {
+  return firstPoint[0] * secondPoint[0] + firstPoint[1] * secondPoint[1];
+}
+
 class Segment {
   constructor(inputX1, inputY1, inputX2, inputY2) {
     this.x1 = inputX1;
@@ -63,12 +78,40 @@ class Segment {
     this.x2 = inputX2;
     this.y2 = inputY2;
   }
+
+  /** Computes the distance from a point to a segment. */
+  distanceFromSegmentToPoint(x, y) {
+    const segmentLength = this.pathDistance();
+    const vectorToFirstPoint = [x - this.x1, y - this.y1];
+    if (segmentLength === 0) {
+      // The segment is a single point.
+      return vectorLength(vectorToFirstPoint);
+    }
+    // Unit vector in the direction of the segment.
+    const directionVector = vectorTimesScalar([
+      (this.x1 - this.x2),
+      (this.y1 - this.y2)
+    ], 1 / segmentLength);
+    const projection = vectorTimesScalar(directionVector, dotProduct(directionVector, vectorToFirstPoint));
+    const projectionLength = vectorLength(projection);
+    if (projectionLength < 0 || projectionLength > segmentLength) {
+      // The heel of the orthogonal projection of the point onto the segment line
+      // lies outside of the segment.
+      const vectorToSecondPoint = [x - this.x2, y - this.y2];
+      const distance1 = vectorLength(vectorToFirstPoint);
+      const distance2 = vectorLength(vectorToSecondPoint);
+      return Math.min(distance1, distance2);
+    }
+    const vectorFromPointToHeelOfPerpendicular = [
+      vectorToFirstPoint[0] - projection[0],
+      vectorToFirstPoint[1] - projection[1]
+    ];
+    return vectorLength(vectorFromPointToHeelOfPerpendicular);
+  }
+
   // the segment length
   pathDistance() {
-    let aSquared = (this.x2 - this.x1) * (this.x2 - this.x1);
-    let bSquared = (this.y2 - this.y1) * (this.y2 - this.y1);
-    return Math.sqrt(aSquared + bSquared);
-
+    return vectorLength([this.x2 - this.x1, this.y2 - this.y1]);
   }
   coordinatesFromProgress(distanceTraveled) {
     // d/p
@@ -307,8 +350,13 @@ class Game {
 
 class ZeusTower {
   constructor() {
+    // Top left corner of the tower.
     this.x = 0;
     this.y = 0;
+    // The center of the tower has coordinates:
+    // this.x + this.towerWidth / 2;
+    // and
+    // this.y + this.towerHeight / 2;
     this.reloadTime = 5;
     this.reloadProgress = 8;
     this.placed = false;
@@ -318,6 +366,8 @@ class ZeusTower {
     this.lastTargetY = 0;
     this.attackProgress = 0;
     this.cost = 100;
+    this.towerWidth = 40;
+    this.towerHeight = 40;
   }
 
   draw() {
@@ -325,14 +375,19 @@ class ZeusTower {
     if (this.reloadProgress > this.reloadTime) {
       this.reloadProgress = this.reloadTime;
     }
-    if (!this.placed) {
+    const hasLegalXYPlacement = this.isLegalToPlaceTowerHere();
+    if (!this.placed && hasLegalXYPlacement) {
       canvas.lineWidth = 1;
       canvas.fillStyle = "rgba(10,25,100,0.5)";
       canvas.beginPath();
       canvas.ellipse(this.x + 20, this.y + 20, this.range, this.range, 0, 0, 360);
       canvas.fill();
     }
-    canvas.fillStyle = "rgb(255,255,255)";
+    if (hasLegalXYPlacement) {
+      canvas.fillStyle = "rgb(255,255,255)";
+    } else {
+      canvas.fillStyle = "red";
+    }
     canvas.fillRect(this.x, this.y, 40, 40);
     canvas.drawImage(image, 2, 42, 38, 40, this.x, this.y, 40, 40);
     if (this.attackProgress > 0) {
@@ -417,6 +472,39 @@ class ZeusTower {
     let distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
     return distance <= this.range;
   }
+
+  /** @return {number[][]} */
+  getCorners() {
+    return [
+      [this.x, this.y],
+      [this.x + this.towerWidth, this.y],
+      [this.x + this.towerWidth, this.y + this.towerHeight],
+      [this.x, this.y + this.towerHeight],
+    ];
+  }
+
+
+  /** 
+   * Returns whether a tower that is not placed can be placed 
+   * at the current x,y coordinates. 
+   * @return {boolean}
+   */
+  isLegalToPlaceTowerHere() {
+    if (this.placed) {
+      // The tower is already placed, the placement is assumed to be legal.
+      return true;
+    }
+    const corners = this.getCorners();
+    for (const segment of game.road.path.segments) {
+      for (const corner of corners) {
+        const distance = segment.distanceFromSegmentToPoint(corner[0], corner[1]);
+        if (distance < game.road.roadWidth / 2) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
 }
 
 class Path {
@@ -471,10 +559,11 @@ class Path {
 class Road {
   constructor() {
     this.path = new Path();
+    this.roadWidth = 50;
   }
   draw() {
     canvas.beginPath();
-    canvas.lineWidth = 50;
+    canvas.lineWidth = this.roadWidth;
     canvas.strokeStyle = "rgb(171,132,65)";
     canvas.moveTo(this.path.segments[0].x1, this.path.segments[0].y1);
     for (let i = 0; i < this.path.segments.length; i++) {
