@@ -408,7 +408,7 @@ class Road {
   draw() {
     canvas.beginPath();
     canvas.lineWidth = 50;
-    canvas.strokeStyle = "rgb(200,200,0)";
+    canvas.strokeStyle = "rgb(171,132,65)";
     canvas.moveTo(this.path.segments[0].x1, this.path.segments[0].y1);
     for (let i = 0; i < this.path.segments.length; i++) {
       let segment = this.path.segments[i];
