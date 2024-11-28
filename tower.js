@@ -64,7 +64,7 @@ function vectorLength(/** @type{number[]} */ vector) {
 }
 
 function vectorTimesScalar(/** @type{number[]} */vector, /** @type{number} */scalar) {
-  return [vector[0] * scalar, vector[0] * scalar];
+  return [vector[0] * scalar, vector[1] * scalar];
 }
 
 function dotProduct(/** @type{number[]} */ firstPoint, /** @type{number[]} */ secondPoint) {
@@ -82,31 +82,26 @@ class Segment {
   /** Computes the distance from a point to a segment. */
   distanceFromSegmentToPoint(x, y) {
     const segmentLength = this.pathDistance();
-    const vectorToFirstPoint = [x - this.x1, y - this.y1];
+    const vectorFromFirstPoint = [x - this.x1, y - this.y1];
     if (segmentLength === 0) {
       // The segment is a single point.
-      return vectorLength(vectorToFirstPoint);
+      return vectorLength(vectorFromFirstPoint);
     }
     // Unit vector in the direction of the segment.
     const directionVector = vectorTimesScalar([
-      (this.x1 - this.x2),
-      (this.y1 - this.y2)
+      (this.x2 - this.x1),
+      (this.y2 - this.y1)
     ], 1 / segmentLength);
-    const projection = vectorTimesScalar(directionVector, dotProduct(directionVector, vectorToFirstPoint));
-    const projectionLength = vectorLength(projection);
+    const projectionLength = dotProduct(directionVector, vectorFromFirstPoint);
+    // The heel of the orthogonal projection of the point onto the segment line
+    // lies outside of the segment.
+    const distance1 = vectorLength(vectorFromFirstPoint);
     if (projectionLength < 0 || projectionLength > segmentLength) {
-      // The heel of the orthogonal projection of the point onto the segment line
-      // lies outside of the segment.
-      const vectorToSecondPoint = [x - this.x2, y - this.y2];
-      const distance1 = vectorLength(vectorToFirstPoint);
-      const distance2 = vectorLength(vectorToSecondPoint);
+      const vectorFromSecondPoint = [x - this.x2, y - this.y2];
+      const distance2 = vectorLength(vectorFromSecondPoint);
       return Math.min(distance1, distance2);
     }
-    const vectorFromPointToHeelOfPerpendicular = [
-      vectorToFirstPoint[0] - projection[0],
-      vectorToFirstPoint[1] - projection[1]
-    ];
-    return vectorLength(vectorFromPointToHeelOfPerpendicular);
+    return Math.sqrt(distance1 * distance1 - projectionLength * projectionLength);
   }
 
   // the segment length
