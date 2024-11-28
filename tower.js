@@ -111,13 +111,26 @@ class Game {
     this.draw();
   }
 
+  buyOrCancelPurchase() {
+    if (this.towerToBePlaced !== null) {
+      this.drachmas += this.towerToBePlaced.cost;
+      this.towerToBePlaced = null;
+      this.buyTowerButton.textContent = this.originalBuyButtonText;
+      this.drawMap();
+      this.displayStatus();
+    } else {
+      this.buyTower();
+      this.displayStatus();
+      this.buyTowerButton.textContent = "Cancel";
+    }
+  }
+
   buyTower() {
     if (this.drachmas < 100) {
       return;
     }
-    this.drachmas = -100 + this.drachmas;
     this.towerToBePlaced = new ZeusTower();
-    this.displayStatus();
+    this.drachmas -= this.towerToBePlaced.cost;
   }
 
   mouseDown(/** @type{MouseEvent} */ ev) {
@@ -139,7 +152,8 @@ class Game {
     if (this.towerToBePlaced !== null && !this.gameRunning) {
       // The user is trying to place a tower before the game starts running.
       // Let's allow them to do so!
-      this.draw();
+      this.drawMap();
+      this.towerToBePlaced.draw();
     }
   }
 
@@ -150,8 +164,9 @@ class Game {
     this.assetsLoaded = false;
     this.buyTowerButton = document.getElementById("buyTower");
     this.buyTowerButton.addEventListener("click", () => {
-      this.buyTower();
+      this.buyOrCancelPurchase();
     });
+    this.originalBuyButtonText = this.buyTowerButton.textContent;
     this.baseHealth = 2000;
     this.frameOfDeath = -1;
     /** @type{ZeusTower|null} */
@@ -243,7 +258,7 @@ class Game {
     this.displayStatus();
   }
 
-  draw() {
+  drawMap() {
     if (this.baseHealth < 0) {
       if (this.frameOfDeath < 0) {
         this.frameOfDeath = this.frameCount;
@@ -256,6 +271,11 @@ class Game {
       clearCanvas("white");
     }
     this.road.draw();
+
+  }
+
+  draw() {
+    this.drawMap();
     for (let tower of this.allTowers) {
       tower.draw();
     }
@@ -290,6 +310,7 @@ class ZeusTower {
     this.lastTargetX = 0;
     this.lastTargetY = 0;
     this.attackProgress = 0;
+    this.cost = 100;
   }
 
   draw() {
