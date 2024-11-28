@@ -6,9 +6,10 @@ console.log(image);
 /** @type {HTMLCanvasElement} */
 let canvasBase = document.getElementById("canvas");
 let canvas = canvasBase.getContext("2d");
-/** @type {HTMLCanvasElement} */
-let assetCanvasBase = document.getElementById("assetCanvas");
-let assetCanvas = assetCanvasBase.getContext("2d");
+let startButton = document.getElementById("startButton");
+startButton.addEventListener("click", () => {
+  game.start();
+});
 
 
 function clearCanvas(color) {
@@ -17,7 +18,6 @@ function clearCanvas(color) {
   canvas.fillRect(0, 0, canvasBase.width, canvasBase.height);
 }
 
-let frameCount = 0;
 
 class Cyclops {
   constructor() {
@@ -34,7 +34,7 @@ class Cyclops {
   }
 
   draw() {
-    let updatedCoordinates = mainPath.coordinatesFromProgress(this.distanceTraveled);
+    let updatedCoordinates = game.road.path.coordinatesFromProgress(this.distanceTraveled);
     this.x = -20 + updatedCoordinates.x + Math.random() * 5;
     this.y = -20 + updatedCoordinates.y + Math.random() * 5;
     this.distanceTraveled = this.distanceTraveled + this.progressPerFrame;
@@ -85,11 +85,34 @@ class Segment {
 
 
 class Game {
+
+  start() {
+    if (this.gameRunning) {
+      return;
+    }
+    if (!this.assetsLoaded) {
+      // Assets haven't loaded yet. Try again in 100ms.
+      setTimeout(() => {
+        this.start();
+      }, 100);
+      return;
+    }
+    this.gameRunning = true;
+    setInterval(() => {
+      this.mainLoop();
+    }, this.millisecondsPerGameTick);
+  }
+
+  mainLoop() {
+    this.frameCount++;
+    this.prepareNextFrame();
+    this.draw();
+  }
+
   buyTower() {
     if (this.drachmas < 100) {
       return;
     }
-
     this.drachmas = -100 + this.drachmas;
     this.towerToBePlaced = new ZeusTower();
   }
@@ -113,6 +136,10 @@ class Game {
   }
 
   constructor() {
+    this.gameRunning = false;
+    this.frameCount = -1;
+    this.millisecondsPerGameTick = 100;
+    this.assetsLoaded = false;
     this.buyTowerButton = document.getElementById("buyTower");
     this.buyTowerButton.addEventListener("click", () => {
       this.buyTower();
@@ -142,6 +169,8 @@ class Game {
     /** @type{MonsterSpawnEvent[]} */
     this.wave = waveData1;
     this.waveStartFrame = 0;
+    // Game objects
+    this.road = new Road();
   }
 
   spawnMonsters() {
@@ -151,7 +180,7 @@ class Game {
   }
 
   processOneSpawnEvent(/**  @type{MonsterSpawnEvent} */e) {
-    let waveFrame = frameCount - this.waveStartFrame;
+    let waveFrame = this.frameCount - this.waveStartFrame;
     if (e.startFrame > waveFrame) {
       return;
     }
@@ -182,7 +211,7 @@ class Game {
     }
   }
   handleMonstersAtBase() {
-    let pathlength = road.path.totalLength();
+    let pathlength = this.road.path.totalLength();
     let monsterIndex = -1;
     let remainingMonsters = [];
     for (let monster of this.allMonsters) {
@@ -209,16 +238,16 @@ class Game {
   draw() {
     if (this.baseHealth < 0) {
       if (this.frameOfDeath < 0) {
-        this.frameOfDeath = frameCount;
+        this.frameOfDeath = this.frameCount;
       }
-      let framesSinceDeath = frameCount - this.frameOfDeath;
+      let framesSinceDeath = this.frameCount - this.frameOfDeath;
       let greenBlueIntensity = Math.max(0, 255 - framesSinceDeath);
       let color = `rgb(255,${greenBlueIntensity}, ${greenBlueIntensity})`;
       clearCanvas(color);
     } else {
       clearCanvas("white");
     }
-    road.draw();
+    this.road.draw();
     for (let tower of this.allTowers) {
       tower.draw();
     }
@@ -236,7 +265,7 @@ class Game {
       Drachmas ${this.drachmas}
       Base health ${this.baseHealth}
       `;
-    this.debugStatusElement.textContent = `path length: ${road.path.totalLength()}`;
+    this.debugStatusElement.textContent = `path length: ${this.road.path.totalLength()}`;
   }
 }
 
@@ -401,6 +430,8 @@ class Path {
     return totalDistance;
   }
 }
+
+
 class Road {
   constructor() {
     this.path = new Path();
@@ -422,7 +453,6 @@ class Road {
     canvas.lineTo(segment.x2, segment.y2);
   }
 }
-5
 
 /** 
  * @typedef {{
@@ -461,28 +491,12 @@ let waveData1 = [
   },
 ];
 
-// Game objects
-let mainPath = new Path();
-let road = new Road();
 let game = new Game();
-
-// Main loop of the game.
-function mainLoop() {
-  game.prepareNextFrame();
-  game.draw();
-  frameCount++;
-}
+game.prepareNextFrame();
+// Draw the game.
+game.draw();
 
 // Load all images and, when loaded, start the mainLoop();
 image.addEventListener("load", () => {
-  assetCanvas.drawImage(image, 0, 0);
-  for (let i = 1; i < 4; i++) {
-    assetCanvas.beginPath();
-    assetCanvas.moveTo(i * 41, 0);
-    assetCanvas.lineTo(i * 41, 40);
-    assetCanvas.strokeStyle = "white";
-    assetCanvas.lineWidth = 3;
-    assetCanvas.stroke();
-  }
-  setInterval(mainLoop, 100);
+  game.assetsLoaded = true;
 });
