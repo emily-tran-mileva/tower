@@ -1,8 +1,6 @@
 "use strict";
-console.log("hello world");
 let image = new Image(); // Create new img element
 image.src = "art.png";
-console.log(image);
 /** @type {HTMLCanvasElement} */
 let canvasBase = document.getElementById("canvas");
 let canvas = canvasBase.getContext("2d");
@@ -97,10 +95,14 @@ class Game {
       }, 100);
       return;
     }
-    this.gameRunning = true;
+    this.initializeGame();
     setInterval(() => {
       this.mainLoop();
     }, this.millisecondsPerGameTick);
+  }
+
+  initializeGame() {
+    this.gameRunning = true;
   }
 
   mainLoop() {
@@ -132,6 +134,11 @@ class Game {
     if (this.towerToBePlaced !== null) {
       this.towerToBePlaced.x = this.lastX - 20;
       this.towerToBePlaced.y = this.lastY - 20;
+    }
+    if (this.towerToBePlaced !== null && !this.gameRunning) {
+      // The user is trying to place a tower before the game starts running.
+      // Let's allow them to do so!
+      this.draw();
     }
   }
 
