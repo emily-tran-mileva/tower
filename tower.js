@@ -478,6 +478,14 @@ class ZeusTower {
     ];
   }
 
+  pointIsAboveTower(x, y) {
+    return (
+      x >= this.x &&
+      x <= this.x + this.towerWidth &&
+      y >= this.y &&
+      y <= this.y + this.towerHeight
+    );
+  }
 
   /** 
    * Returns whether a tower that is not placed can be placed 
@@ -494,6 +502,17 @@ class ZeusTower {
       for (const corner of corners) {
         const distance = segment.distanceFromSegmentToPoint(corner[0], corner[1]);
         if (distance < game.road.roadWidth / 2) {
+          return false;
+        }
+      }
+    }
+    for (const tower of game.allTowers) {
+      for (const corner of corners) {
+        if (tower.pointIsAboveTower(corner[0], corner[1])) {
+          // The corner of the present tower is above another tower. 
+          // This means that the two squares intersect.
+          // Since the tower squares are of the same size, this
+          // is the only way that two towers can overlap.
           return false;
         }
       }
