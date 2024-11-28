@@ -116,12 +116,17 @@ class Game {
       this.drachmas += this.towerToBePlaced.cost;
       this.towerToBePlaced = null;
       this.buyTowerButton.textContent = this.originalBuyButtonText;
-      this.drawMap();
-      this.displayStatus();
+      if (!this.gameRunning) {
+        // The player is buying before the game started.
+        this.drawMap();
+        this.displayStatus();
+      }
     } else {
       this.buyTower();
-      this.displayStatus();
-      this.buyTowerButton.textContent = "Cancel";
+      if (!this.gameRunning) {
+        // The player is buying before the game started.
+        this.displayStatus();
+      }
     }
   }
 
@@ -131,6 +136,7 @@ class Game {
     }
     this.towerToBePlaced = new ZeusTower();
     this.drachmas -= this.towerToBePlaced.cost;
+    this.buyTowerButton.textContent = "Cancel";
   }
 
   mouseDown(/** @type{MouseEvent} */ ev) {
@@ -139,6 +145,7 @@ class Game {
       this.allTowers.push(this.towerToBePlaced);
       this.towerToBePlaced.placed = true;
       this.towerToBePlaced = null;
+      this.buyTowerButton.textContent = this.originalBuyButtonText;
     }
   }
 
