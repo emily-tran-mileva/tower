@@ -27,10 +27,12 @@ class Cyclops {
     // A number between 0 and 3.
     this.pose = 0;
     this.distanceTraveled = 0;
-    this.maxHealth = 300;
+    this.maxHealth = 100;
     this.health = this.maxHealth;
     this.progressPerFrame = 10;
+    this.drachmasReward = 50;
   }
+
   draw() {
     let updatedCoordinates = mainPath.coordinatesFromProgress(this.distanceTraveled);
     this.x = -20 + updatedCoordinates.x + Math.random() * 5;
@@ -247,7 +249,7 @@ class ZeusTower {
     this.reloadProgress = 8;
     this.placed = false;
     this.range = 150;
-    this.damage = 25;
+    this.damage = 20;
     this.lastTargetX = 0;
     this.lastTargetY = 0;
     this.attackProgress = 0;
@@ -331,6 +333,8 @@ class ZeusTower {
     candidateTarget.health -= this.damage;
     if (candidateTarget.health <= 0) {
       // The candidateTarget is dead.
+      // Claim reward:
+      game.drachmas += candidateTarget.drachmasReward;
       let lastMonsterIndex = allMonsters.length - 1;
       let lastMonster = allMonsters[lastMonsterIndex];
       // Overwrite the candidate monster with the last monster 
@@ -365,8 +369,7 @@ class Path {
       [50, 450],
       [50, 550],
       [525, 550],
-      [300, 300]
-      // [525, 670]
+      [525, 670]
     ];
     /** @type {Segment[]} */
     this.segments = [];
@@ -419,7 +422,7 @@ class Road {
     canvas.lineTo(segment.x2, segment.y2);
   }
 }
-
+5
 
 /** 
  * @typedef {{
