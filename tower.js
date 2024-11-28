@@ -117,6 +117,7 @@ class Game {
     }
     this.drachmas = -100 + this.drachmas;
     this.towerToBePlaced = new ZeusTower();
+    this.displayStatus();
   }
 
   mouseDown(/** @type{MouseEvent} */ ev) {
