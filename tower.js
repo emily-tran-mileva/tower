@@ -11,8 +11,10 @@ let assetCanvasBase = document.getElementById("assetCanvas");
 let assetCanvas = assetCanvasBase.getContext("2d");
 
 
-function clearCanvas() {
+function clearCanvas(color) {
   canvas.clearRect(0, 0, canvasBase.width, canvasBase.height);
+  canvas.fillStyle = color;
+  canvas.fillRect(0, 0, canvasBase.width, canvasBase.height);
 }
 
 let frameCount = 0;
@@ -27,12 +29,13 @@ class Cyclops {
     this.distanceTraveled = 0;
     this.maxHealth = 300;
     this.health = this.maxHealth;
+    this.progressPerFrame = 10;
   }
   draw() {
     let updatedCoordinates = mainPath.coordinatesFromProgress(this.distanceTraveled);
     this.x = -20 + updatedCoordinates.x + Math.random() * 5;
     this.y = -20 + updatedCoordinates.y + Math.random() * 5;
-    this.distanceTraveled = this.distanceTraveled + 10;
+    this.distanceTraveled = this.distanceTraveled + this.progressPerFrame;
     canvas.drawImage(image, 41 * this.pose + 2, 0, 38, 40, this.x, this.y, 40, 40);
     canvas.beginPath();
     canvas.roundRect(this.x, this.y - 8, 40, 4, 2);
@@ -60,6 +63,7 @@ class Segment {
     this.x2 = inputX2;
     this.y2 = inputY2;
   }
+  // the segment length
   pathDistance() {
     let aSquared = (this.x2 - this.x1) * (this.x2 - this.x1);
     let bSquared = (this.y2 - this.y1) * (this.y2 - this.y1);
@@ -111,9 +115,12 @@ class Game {
     this.buyTowerButton.addEventListener("click", () => {
       this.buyTower();
     });
+    this.baseHealth = 2000;
+    this.frameOfDeath = -1;
     /** @type{ZeusTower|null} */
     this.towerToBePlaced = null;
     this.statusElement = document.getElementById("status");
+    this.debugStatusElement = document.getElementById("debugStatus");
     this.drachmas = 101;
     canvasBase.addEventListener("mousemove", (ev) => {
       this.mouseMove(ev);
@@ -128,7 +135,7 @@ class Game {
     this.canvasInPageY = canvasBoundingRectangle.y;
     /** @type{ZeusTower[]} */
     this.allTowers = [];
-    /** @type{Cyclops} */
+    /** @type{Cyclops[]} */
     this.allMonsters = [];
     /** @type{MonsterSpawnEvent[]} */
     this.wave = waveData1;
@@ -172,14 +179,44 @@ class Game {
       tower.fireAtMonsters(this.allMonsters);
     }
   }
+  handleMonstersAtBase() {
+    let pathlength = road.path.totalLength();
+    let monsterIndex = -1;
+    let remainingMonsters = [];
+    for (let monster of this.allMonsters) {
+      monsterIndex++;
+      if (monster.distanceTraveled < pathlength - monster.progressPerFrame - 1) {
+        remainingMonsters.push(monster);
+      } else {
+        // the monster is at the finish line. 
+        // We want it gone, so we won't add it to the remaining monsters.
+        // However, it does damage!
+        this.baseHealth -= monster.health;
+      }
+    }
+    this.allMonsters = remainingMonsters;
+  }
 
   prepareNextFrame() {
     this.spawnMonsters();
     this.fireAtMonsters();
+    this.handleMonstersAtBase();
     this.displayStatus();
   }
 
   draw() {
+    if (this.baseHealth < 0) {
+      if (this.frameOfDeath < 0) {
+        this.frameOfDeath = frameCount;
+      }
+      let framesSinceDeath = frameCount - this.frameOfDeath;
+      let greenBlueIntensity = Math.max(0, 255 - framesSinceDeath);
+      let color = `rgb(255,${greenBlueIntensity}, ${greenBlueIntensity})`;
+      clearCanvas(color);
+    } else {
+      clearCanvas("white");
+    }
+    road.draw();
     for (let tower of this.allTowers) {
       tower.draw();
     }
@@ -192,8 +229,12 @@ class Game {
   }
 
   displayStatus() {
-    this.statusElement.textContent = `Drachmas ${this.drachmas}`;
-
+    this.statusElement.textContent =
+      `
+      Drachmas ${this.drachmas}
+      Base health ${this.baseHealth}
+      `;
+    this.debugStatusElement.textContent = `path length: ${road.path.totalLength()}`;
   }
 }
 
@@ -324,7 +365,8 @@ class Path {
       [50, 450],
       [50, 550],
       [525, 550],
-      [525, 670]
+      [300, 300]
+      // [525, 670]
     ];
     /** @type {Segment[]} */
     this.segments = [];
@@ -347,6 +389,13 @@ class Path {
     let lastWaypoint = this.wayPoints[this.wayPoints.length - 1];
     return new Coordinates(lastWaypoint[0], lastWaypoint[1]);
 
+  }
+  totalLength() {
+    let totalDistance = 0;
+    for (let segment of this.segments) {
+      totalDistance += segment.pathDistance();
+    }
+    return totalDistance;
   }
 }
 class Road {
@@ -395,6 +444,18 @@ let waveData1 = [
     amount: 5,
     frequency: 10
   },
+  {
+    startFrame: 140,
+    monster: "cyclops",
+    amount: 10,
+    frequency: 5
+  },
+  {
+    startFrame: 210,
+    monster: "cyclops",
+    amount: 20,
+    frequency: 3
+  },
 ];
 
 // Game objects
@@ -404,8 +465,6 @@ let game = new Game();
 
 // Main loop of the game.
 function mainLoop() {
-  clearCanvas();
-  road.draw();
   game.prepareNextFrame();
   game.draw();
   frameCount++;
