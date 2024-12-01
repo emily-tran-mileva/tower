@@ -179,7 +179,8 @@ class Game {
 
   mouseDown(/** @type{MouseEvent} */ ev) {
     this.mouseMove(ev);
-    if (this.towerToBePlaced !== null) {
+    if (this.towerToBePlaced !== null && this.towerToBePlaced.isLegalToPlaceTowerHere()) {
+      // Place the tower.
       this.allTowers.push(this.towerToBePlaced);
       this.towerToBePlaced.placed = true;
       this.towerToBePlaced = null;
@@ -212,7 +213,7 @@ class Game {
       this.buyOrCancelPurchase();
     });
     this.originalBuyButtonText = this.buyTowerButton.textContent;
-    this.baseHealth = 2000;
+    this.baseHealth = 300;
     this.frameOfDeath = -1;
     /** @type{ZeusTower|null} */
     this.towerToBePlaced = null;
@@ -298,9 +299,15 @@ class Game {
 
   prepareNextFrame() {
     this.spawnMonsters();
+    this.reloadTowers();
     this.fireAtMonsters();
     this.handleMonstersAtBase();
     this.displayStatus();
+  }
+  reloadTowers() {
+    for (let tower of this.allTowers) {
+      tower.reload();
+    }
   }
 
   drawMap() {
@@ -353,7 +360,7 @@ class ZeusTower {
     // and
     // this.y + this.towerHeight / 2;
     this.reloadTime = 5;
-    this.reloadProgress = 8;
+    this.reloadProgress = 0;
     this.placed = false;
     this.range = 150;
     this.damage = 20;
@@ -365,11 +372,14 @@ class ZeusTower {
     this.towerHeight = 40;
   }
 
-  draw() {
+  reload() {
     this.reloadProgress++;
     if (this.reloadProgress > this.reloadTime) {
       this.reloadProgress = this.reloadTime;
     }
+  }
+
+  draw() {
     const hasLegalXYPlacement = this.isLegalToPlaceTowerHere();
     if (!this.placed && hasLegalXYPlacement) {
       canvas.lineWidth = 1;
@@ -384,7 +394,8 @@ class ZeusTower {
       canvas.fillStyle = "red";
     }
     canvas.fillRect(this.x, this.y, 40, 40);
-    canvas.drawImage(image, 2, 42, 38, 40, this.x, this.y, 40, 40);
+    const pose = Math.min(3, this.reloadProgress);
+    canvas.drawImage(image, 2 + pose * 41, 42, 38, 40, this.x, this.y, 40, 40);
     if (this.attackProgress > 0) {
       // lightning on the monster
       canvas.beginPath();
