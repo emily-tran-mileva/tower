@@ -395,7 +395,7 @@ class ZeusTower {
     }
     canvas.fillRect(this.x, this.y, 40, 40);
     const pose = Math.min(3, this.reloadProgress);
-    canvas.drawImage(image, 2 + pose * 41, 42, 38, 40, this.x, this.y, 40, 40);
+    canvas.drawImage(image, 0 + pose * 41, 124, 39, 38, this.x, this.y, 39, 38);
     if (this.attackProgress > 0) {
       // lightning on the monster
       canvas.beginPath();
