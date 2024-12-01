@@ -36,7 +36,8 @@ class Cyclops {
     this.x = -20 + updatedCoordinates.x + Math.random() * 5;
     this.y = -20 + updatedCoordinates.y + Math.random() * 5;
     this.distanceTraveled = this.distanceTraveled + this.progressPerFrame;
-    canvas.drawImage(image, 41 * this.pose + 2, 0, 38, 40, this.x, this.y, 40, 40);
+    let poseInteger = Math.floor(this.pose)
+    canvas.drawImage(image, 41 * poseInteger + 2, 0, 38, 40, this.x, this.y, 40, 40);
     canvas.beginPath();
     canvas.roundRect(this.x, this.y - 8, 40, 4, 2);
     canvas.fillStyle = "red";
@@ -46,7 +47,7 @@ class Cyclops {
     canvas.fillStyle = "green";
     canvas.fill();
 
-    this.pose = (this.pose + 1) % 4;
+    this.pose = (this.pose + 0.5) % 4;
   }
 }
 class Coordinates {
