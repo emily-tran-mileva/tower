@@ -10,13 +10,6 @@ startButton.addEventListener("click", () => {
 });
 
 
-function clearCanvas(color) {
-  canvas.clearRect(0, 0, canvasBase.width, canvasBase.height);
-  canvas.fillStyle = color;
-  canvas.fillRect(0, 0, canvasBase.width, canvasBase.height);
-}
-
-
 class Cyclops {
   constructor() {
     // Top left corner of our cyclops.
@@ -29,16 +22,19 @@ class Cyclops {
     this.health = this.maxHealth;
     this.progressPerFrame = 10;
     this.drachmasReward = 50;
-    this.lastCyclopsDirection = [0, 0];
   }
 
   draw() {
-    let updatedCoordinates = game.road.path.coordinatesFromProgress(this.distanceTraveled);
+    let coordinatesAndDirection = game.road.path.coordinatesAndDirectionFromProgress(
+      this.distanceTraveled
+    );
+    const updatedCoordinates = coordinatesAndDirection.coordinates;
+    const lastDirection = coordinatesAndDirection.direction;
     this.x = -20 + updatedCoordinates.x + Math.random() * 5;
     this.y = -20 + updatedCoordinates.y + Math.random() * 5;
     this.distanceTraveled = this.distanceTraveled + this.progressPerFrame;
     let poseColumn = Math.floor(this.pose);
-    let poseRow = 1;
+    let poseRow = this.computePoseRow(lastDirection);
 
     canvas.drawImage(image, 41 * poseColumn + 1, 41 * poseRow + 1, 38, 38, this.x, this.y, 40, 40);
     canvas.beginPath();
@@ -52,7 +48,40 @@ class Cyclops {
 
     this.pose = (this.pose + 0.5) % 4;
   }
+
+  computePoseRow(/** @type{number[]} */ direction) {
+    // The angle in which the monster is facing.
+    const angle = Math.atan2(
+      -direction[1], direction[0]
+    ) * 180 / Math.PI;
+    if (angle >= -45 && angle <= 45) {
+      // The angle is between -45 degress and 45 degrees.
+      // Therefore the monster is facing to the right.
+      return 1;
+    }
+    if (angle >= 45 && angle <= 135) {
+      // The moster is facing up.
+      return 3;
+    }
+    if (angle >= 135 || angle <= -135) {
+      return 2;
+    }
+    if (angle >= -135 && angle <= -45) {
+      return 0;
+    }
+    return 0;
+  }
 }
+
+
+class CoordinatesAndDirection {
+  constructor(coordinates,  /** @type{number[]} */direction) {
+    this.coordinates = coordinates;
+    this.direction = direction;
+  }
+}
+
+
 class Coordinates {
   constructor(inputX, inputY) {
     this.x = inputX;
@@ -92,10 +121,7 @@ class Segment {
       return vectorLength(vectorFromFirstPoint);
     }
     // Unit vector in the direction of the segment.
-    const directionVector = vectorTimesScalar([
-      (this.x2 - this.x1),
-      (this.y2 - this.y1)
-    ], 1 / segmentLength);
+    const directionVector = vectorTimesScalar(this.segmentVector(), 1 / segmentLength);
     const projectionLength = dotProduct(directionVector, vectorFromFirstPoint);
     // The heel of the orthogonal projection of the point onto the segment line
     // lies outside of the segment.
@@ -108,18 +134,27 @@ class Segment {
     return Math.sqrt(distance1 * distance1 - projectionLength * projectionLength);
   }
 
+  segmentVector() {
+    return [
+      (this.x2 - this.x1),
+      (this.y2 - this.y1)
+    ];
+  }
+
   // the segment length
   pathDistance() {
     return vectorLength([this.x2 - this.x1, this.y2 - this.y1]);
   }
-  coordinatesFromProgress(distanceTraveled) {
+
+  /** @returns{CoordinatesAndDirection} */
+  coordinatesAndDirectionFromProgress(distanceTraveled) {
     // d/p
     let progress = distanceTraveled / this.pathDistance();
     // 1-d/p
     let oneMinusProgress = 1 - progress;
     let a = this.x1 * oneMinusProgress + this.x2 * progress;
     let b = this.y1 * oneMinusProgress + this.y2 * progress;
-    return new Coordinates(a, b);
+    return new CoordinatesAndDirection(new Coordinates(a, b), this.segmentVector());
   }
 }
 
@@ -308,10 +343,17 @@ class Game {
     this.handleMonstersAtBase();
     this.displayStatus();
   }
+
   reloadTowers() {
     for (let tower of this.allTowers) {
       tower.reload();
     }
+  }
+
+  clearCanvas(color) {
+    canvas.clearRect(0, 0, canvasBase.width, canvasBase.height);
+    canvas.fillStyle = color;
+    canvas.fillRect(0, 0, canvasBase.width, canvasBase.height);
   }
 
   drawMap() {
@@ -322,9 +364,9 @@ class Game {
       let framesSinceDeath = this.frameCount - this.frameOfDeath;
       let greenBlueIntensity = Math.max(0, 255 - framesSinceDeath);
       let color = `rgb(255,${greenBlueIntensity}, ${greenBlueIntensity})`;
-      clearCanvas(color);
+      this.clearCanvas(color);
     } else {
-      clearCanvas("white");
+      this.clearCanvas("white");
     }
     this.road.draw();
 
@@ -562,19 +604,26 @@ class Path {
       this.segments.push(segment);
     }
   }
-  coordinatesFromProgress(distanceTraveled) {
+
+  /** @return {CoordinatesAndDirection} */
+  coordinatesAndDirectionFromProgress(distanceTraveled) {
     let remainingDistance = distanceTraveled;
     for (let i = 0; i < this.segments.length; i++) {
       let segment = this.segments[i];
       if (remainingDistance < segment.pathDistance()) {
-        return segment.coordinatesFromProgress(remainingDistance);
+        return segment.coordinatesAndDirectionFromProgress(remainingDistance);
       }
       remainingDistance = remainingDistance - segment.pathDistance();
     }
     let lastWaypoint = this.wayPoints[this.wayPoints.length - 1];
-    return new Coordinates(lastWaypoint[0], lastWaypoint[1]);
+    let lastSegment = this.segments[this.segments.length - 1];
+    return new CoordinatesAndDirection(
+      new Coordinates(lastWaypoint[0], lastWaypoint[1]),
+      lastSegment.segmentVector()
+    );
 
   }
+
   totalLength() {
     let totalDistance = 0;
     for (let segment of this.segments) {
